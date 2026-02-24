@@ -2,20 +2,41 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Opta Pro Analyst Suite - 2026</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Opta Pro Analyst Terminal v6.0</title>
     <style>
-        :root { --opta-red: #e02020; --bg: #0a0a0a; --panel: #1a1a1a; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: #fff; margin: 0; display: flex; height: 100vh; overflow: hidden; }
-        #video-section { flex: 2; background: #000; display: flex; flex-direction: column; border-right: 2px solid #333; }
-        #yt-player { width: 100%; height: 70%; }
-        .video-controls { padding: 15px; background: var(--panel); flex-grow: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;}
+        :root { --opta-red: #e02020; --bg: #050505; --panel: #111; --text: #e0e0e0; --home: #3498db; --away: #f1c40f; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* Left: Video & Controls */
+        #video-section { flex: 2; background: #000; display: flex; flex-direction: column; border-right: 2px solid #222; }
+        #yt-player { width: 100%; height: 70%; background: #000; }
+        .video-controls { padding: 15px; background: var(--panel); flex-grow: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; border-top: 1px solid #333; }
+
+        /* Right: Data Feed */
         #data-section { flex: 1; display: flex; flex-direction: column; background: var(--panel); }
-        .header { padding: 15px; border-bottom: 2px solid var(--opta-red); font-weight: bold; font-size: 12px; display: flex; justify-content: space-between; }
-        #log { flex-grow: 1; overflow-y: auto; padding: 10px; font-family: 'Courier New', monospace; font-size: 12px; }
-        .event { padding: 6px; border-bottom: 1px solid #333; display: grid; grid-template-columns: 60px 1fr 60px; transition: 0.3s; }
-        .fail { color: #e74c3c; text-decoration: line-through; }
-        #pitch-map { width: 200px; height: 120px; background: #2e7d32; border: 1px solid #fff; position: relative; cursor: crosshair; }
-        .stabilization-glow { color: #2ecc71; text-shadow: 0 0 5px #2ecc71; font-size: 10px; }
+        .header { padding: 15px; border-bottom: 2px solid var(--opta-red); font-weight: bold; font-size: 11px; display: flex; justify-content: space-between; align-items: center; }
+        .stabilization-glow { color: #2ecc71; text-shadow: 0 0 8px #2ecc71; font-weight: bold; letter-spacing: 1px; }
+        #log { flex-grow: 1; overflow-y: auto; padding: 10px; font-family: 'Consolas', monospace; font-size: 12px; }
+        
+        /* Event Styling */
+        .event { padding: 8px; border-bottom: 1px solid #222; display: grid; grid-template-columns: 50px 1fr 60px; align-items: center; transition: background 0.2s; }
+        .event.flagged { background: rgba(224, 32, 32, 0.15); border-left: 4px solid var(--opta-red); }
+        .event.fail { color: #999; text-decoration: line-through; }
+        .home-tag { color: var(--home); }
+        .away-tag { color: var(--away); }
+
+        /* Mini-Map Styling */
+        #pitch-map { width: 100%; height: 130px; background: #1b4d1b; border: 1px solid #fff; position: relative; cursor: crosshair; border-radius: 4px; }
+        .pitch-line { position: absolute; border: 1px solid rgba(255,255,255,0.3); }
+        .half-way { left: 50%; height: 100%; }
+        .center-circle { left: 50%; top: 50%; transform: translate(-50%, -50%); width: 30px; height: 30px; border-radius: 50%; }
+        #marker { position: absolute; width: 6px; height: 6px; background: var(--opta-red); border-radius: 50%; display: none; transform: translate(-50%, -50%); box-shadow: 0 0 5px #fff; }
+
+        input, button, select { background: #000; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 4px; }
+        button { cursor: pointer; background: var(--opta-red); border: none; font-weight: bold; }
+        button:hover { filter: brightness(1.2); }
+        .review-btn { background: #333; width: 100%; margin-top: 5px; }
     </style>
 </head>
 <body>
@@ -24,56 +45,130 @@
     <div id="yt-player"></div>
     <div class="video-controls">
         <div>
-            <input type="text" id="ytUrl" placeholder="YouTube URL..." style="background:#000; color:#fff; border:1px solid #444; padding:5px; width:80%;">
-            <button onclick="loadYoutube()" style="background:var(--opta-red); border:none; color:#fff; padding:5px;">LOAD</button>
-            <div style="margin-top:10px;">
-                <button onclick="exportCSV()" style="background:#444; color:#fff; border:none; padding:10px; cursor:pointer;">EXPORT CSV DATA</button>
-                <button onclick="showReviewList()" style="background:#222; color:#ccc; border:none; padding:10px; cursor:pointer;">LET'S REVIEW</button>
+            <input type="text" id="ytUrl" placeholder="Paste YouTube URL..." style="width: 70%;">
+            <button onclick="loadYoutube()">LOAD</button>
+            <div style="margin-top:12px;">
+                <label style="font-size: 11px;">Playback Speed: </label>
+                <select id="speedSelect" onchange="updateSpeed()">
+                    <option value="1">1.0x</option>
+                    <option value="0.5" selected>0.5x (Opta Standard)</option>
+                    <option value="0.25">0.25x</option>
+                </select>
             </div>
+            <button class="review-btn" onclick="showReviewList()">LET'S REVIEW (Checklist)</button>
+            <button class="review-btn" style="background:#222;" onclick="exportCSV()">EXPORT CSV</button>
         </div>
         <div>
             <div id="pitch-map" onclick="handleMapClick(event)">
-                <div style="position:absolute; left:50%; height:100%; border-left:1px solid #fff;"></div>
-                <div id="marker" style="position:absolute; width:6px; height:6px; background:red; border-radius:50%; display:none;"></div>
+                <div class="pitch-line half-way"></div>
+                <div class="pitch-line center-circle"></div>
+                <div id="marker"></div>
             </div>
-            <p style="font-size:10px; color:#888;">[Numpad 1-9] for Fast Zones | [Tab] Toggle Fail</p>
+            <p style="font-size: 10px; color: #888; margin-top: 5px;">
+                <b>XBOX:</b> A=Pass, B=Shot, X=Tackle, Y=Flag, Start=Pause<br>
+                <b>KEYBOARD:</b> 1-4=Tag, 5=Flag, Space=Pause, Tab=Fail Toggle
+            </p>
         </div>
     </div>
 </div>
 
 <div id="data-section">
     <div class="header">
-        <div>OPTA_FULL_SUITE_v6</div>
-        <div class="stabilization-glow">DATA STABILIZATION: OPTIMAL</div>
+        <div>OPTA_PRO_COLLECTOR_v6</div>
+        <div class="stabilization-glow">DATA STABILIZATION: ACTIVE</div>
     </div>
-    <div id="log"></div>
+    <div id="log">
+        <div style="padding: 20px; color: #666; text-align: center;">Waiting for first event...</div>
+    </div>
 </div>
 
 <script>
-    let player, lastInput = 0, eventLog = [];
+    let player;
+    let eventLog = [];
+    let lastInput = 0;
     const DEBOUNCE = 250;
+    let activeTeam = "Home";
 
-    // Load YT API
-    const tag = document.createElement('script'); tag.src = "https://www.youtube.com/iframe_api";
+    // 1. YouTube API Integration with Origin fix for Error 153
+    const tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
     document.head.appendChild(tag);
-    function onYouTubeIframeAPIReady() {
-        player = new YT.Player('yt-player', { height: '100%', width: '100%', videoId: '', events: { 'onReady': () => player.setPlaybackRate(0.5) } });
-    }
-    function loadYoutube() { const id = document.getElementById('ytUrl').value.split('v=')[1]?.split('&')[0]; player.loadVideoById(id); }
 
-    // Input Handling
+    function onYouTubeIframeAPIReady() {
+        player = new YT.Player('yt-player', {
+            height: '100%',
+            width: '100%',
+            videoId: '', 
+            playerVars: { 
+                'origin': window.location.origin,
+                'enablejsapi': 1 
+            },
+            events: {
+                'onReady': (e) => e.target.setPlaybackRate(0.5),
+                'onError': (e) => alert("YouTube Error " + e.data + ": Check if embedding is allowed for this video.")
+            }
+        });
+    }
+
+    function loadYoutube() {
+        const url = document.getElementById('ytUrl').value;
+        const videoId = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
+        if(videoId) player.loadVideoById(videoId);
+    }
+
+    function updateSpeed() {
+        const s = parseFloat(document.getElementById('speedSelect').value);
+        player.setPlaybackRate(s);
+    }
+
+    // 2. Hybrid Input Handling (Xbox + Keyboard)
     window.addEventListener('keydown', (e) => {
         if (Date.now() - lastInput < DEBOUNCE) return;
-        if (['1','2','3','4'].includes(e.key)) logEvent(e.key);
-        if (e.key === 'Tab') { e.preventDefault(); toggleFail(); }
-        if (e.key === ' ') { e.preventDefault(); player.getPlayerState() === 1 ? player.pauseVideo() : player.playVideo(); }
+        switch(e.key) {
+            case '1': logEvent(1, "PASS"); break;
+            case '2': logEvent(13, "SHOT"); break;
+            case '3': logEvent(7, "TACKLE"); break;
+            case '4': logEvent(49, "RECOVERY"); break;
+            case '5': logEvent(999, "FLAG", true); break;
+            case 'Tab': e.preventDefault(); toggleFail(); break;
+            case ' ': e.preventDefault(); togglePlay(); break;
+        }
     });
 
-    function logEvent(key) {
-        const types = {'1':['PASS',1], '2':['SHOT',13], '3':['TACKLE',7], '4':['RECOVERY',49]};
-        const [type, id] = types[key];
+    function pollGamepad() {
+        const gp = navigator.getGamepads()[0];
+        if (gp && Date.now() - lastInput > DEBOUNCE) {
+            if (gp.buttons[0].pressed) logEvent(1, "PASS");
+            if (gp.buttons[1].pressed) logEvent(13, "SHOT");
+            if (gp.buttons[2].pressed) logEvent(7, "TACKLE");
+            if (gp.buttons[3].pressed) logEvent(49, "RECOVERY");
+            if (gp.buttons[4].pressed) activeTeam = "Home";
+            if (gp.buttons[5].pressed) activeTeam = "Away";
+            if (gp.buttons[3].pressed && gp.buttons[4].pressed) logEvent(999, "FLAG", true); // Y button
+            if (gp.buttons[9].pressed) { togglePlay(); lastInput = Date.now(); }
+            if (gp.buttons[8].pressed) { player.seekTo(player.getCurrentTime() - 5); lastInput = Date.now(); }
+        }
+        requestAnimationFrame(pollGamepad);
+    }
+
+    function togglePlay() {
+        const state = player.getPlayerState();
+        state === 1 ? player.pauseVideo() : player.playVideo();
+    }
+
+    // 3. Core Tagging Logic
+    function logEvent(id, type, isFlag = false) {
         const time = player.getCurrentTime();
-        const eventObj = { time, type, id, success: true, x: 50, y: 50 };
+        const eventObj = {
+            time: time,
+            displayTime: formatTime(time),
+            type: type,
+            id: id,
+            team: activeTeam,
+            success: true,
+            flagged: isFlag,
+            x: 50, y: 50
+        };
         eventLog.push(eventObj);
         renderLog();
         lastInput = Date.now();
@@ -90,37 +185,68 @@
         const rect = e.currentTarget.getBoundingClientRect();
         const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
         const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+        
         if (eventLog.length > 0) {
             eventLog[eventLog.length - 1].x = x;
             eventLog[eventLog.length - 1].y = y;
+            
+            const marker = document.getElementById('marker');
+            marker.style.left = (e.clientX - rect.left) + 'px';
+            marker.style.top = (e.clientY - rect.top) + 'px';
+            marker.style.display = 'block';
+            
             renderLog();
         }
     }
 
     function renderLog() {
-        logEl.innerHTML = '';
-        [...eventLog].reverse().forEach(ev => {
+        const logContainer = document.getElementById('log');
+        logContainer.innerHTML = '';
+        [...eventLog].reverse().forEach((ev, index) => {
             const div = document.createElement('div');
-            div.className = `event ${ev.success ? '' : 'fail'}`;
-            div.innerHTML = `<span>${Math.floor(ev.time/60)}:${Math.floor(ev.time%60).toString().padStart(2,'0')}</span>
-                             <span>${ev.type} (${ev.x},${ev.y})</span>
-                             <span>ID:${ev.id}</span>`;
-            logEl.appendChild(div);
+            div.className = `event ${ev.flagged ? 'flagged' : ''} ${ev.success ? '' : 'fail'}`;
+            div.innerHTML = `
+                <span>${ev.displayTime}</span>
+                <span class="${ev.team === 'Home' ? 'home-tag' : 'away-tag'}">
+                    <b>${ev.team.toUpperCase()}</b>: ${ev.type} (${ev.x},${ev.y})
+                </span>
+                <span style="text-align:right; font-size:10px; color:#666;">ID:${ev.id}</span>
+            `;
+            logContainer.appendChild(div);
         });
     }
 
+    function formatTime(time) {
+        const mins = Math.floor(time / 60);
+        const secs = Math.floor(time % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    // 4. Data Review & Export
+    function showReviewList() {
+        const unresolved = eventLog.filter(e => e.flagged || !e.success);
+        if (unresolved.length === 0) return alert("All clear! No unresolved items.");
+        let list = "UNRESOLVED CHECKLIST:\n" + unresolved.map((item, i) => `${i+1}. [${item.displayTime}] ${item.type} (Review Location/Outcome)`).join('\n');
+        alert(list);
+    }
+
     function exportCSV() {
-        let csv = "Time,Event,ID,Success,X,Y\n";
-        eventLog.forEach(e => csv += `${e.time},${e.type},${e.id},${e.success},${e.x},${e.y}\n`);
+        let csv = "Time,Team,Event,ID,Success,X,Y,Flagged\n";
+        eventLog.forEach(e => {
+            csv += `${e.displayTime},${e.team},${e.type},${e.id},${e.success},${e.x},${e.y},${e.flagged}\n`;
+        });
         const blob = new Blob([csv], { type: 'text/csv' });
         const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = 'match_data.csv'; a.click();
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `match_tagging_${Date.now()}.csv`;
+        a.click();
     }
-    
-    function showReviewList() {
-        const flags = eventLog.filter(e => !e.success);
-        alert(flags.length ? `Review ${flags.length} failed actions.` : "All actions successful.");
-    }
+
+    window.addEventListener("gamepadconnected", () => {
+        console.log("Controller Active");
+        pollGamepad();
+    });
 </script>
 </body>
 </html>
