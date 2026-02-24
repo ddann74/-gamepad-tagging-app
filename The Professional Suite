@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Opta Pro Analyst Suite - 2026</title>
+    <style>
+        :root { --opta-red: #e02020; --bg: #0a0a0a; --panel: #1a1a1a; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: #fff; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        #video-section { flex: 2; background: #000; display: flex; flex-direction: column; border-right: 2px solid #333; }
+        #yt-player { width: 100%; height: 70%; }
+        .video-controls { padding: 15px; background: var(--panel); flex-grow: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;}
+        #data-section { flex: 1; display: flex; flex-direction: column; background: var(--panel); }
+        .header { padding: 15px; border-bottom: 2px solid var(--opta-red); font-weight: bold; font-size: 12px; display: flex; justify-content: space-between; }
+        #log { flex-grow: 1; overflow-y: auto; padding: 10px; font-family: 'Courier New', monospace; font-size: 12px; }
+        .event { padding: 6px; border-bottom: 1px solid #333; display: grid; grid-template-columns: 60px 1fr 60px; transition: 0.3s; }
+        .fail { color: #e74c3c; text-decoration: line-through; }
+        #pitch-map { width: 200px; height: 120px; background: #2e7d32; border: 1px solid #fff; position: relative; cursor: crosshair; }
+        .stabilization-glow { color: #2ecc71; text-shadow: 0 0 5px #2ecc71; font-size: 10px; }
+    </style>
+</head>
+<body>
+
+<div id="video-section">
+    <div id="yt-player"></div>
+    <div class="video-controls">
+        <div>
+            <input type="text" id="ytUrl" placeholder="YouTube URL..." style="background:#000; color:#fff; border:1px solid #444; padding:5px; width:80%;">
+            <button onclick="loadYoutube()" style="background:var(--opta-red); border:none; color:#fff; padding:5px;">LOAD</button>
+            <div style="margin-top:10px;">
+                <button onclick="exportCSV()" style="background:#444; color:#fff; border:none; padding:10px; cursor:pointer;">EXPORT CSV DATA</button>
+                <button onclick="showReviewList()" style="background:#222; color:#ccc; border:none; padding:10px; cursor:pointer;">LET'S REVIEW</button>
+            </div>
+        </div>
+        <div>
+            <div id="pitch-map" onclick="handleMapClick(event)">
+                <div style="position:absolute; left:50%; height:100%; border-left:1px solid #fff;"></div>
+                <div id="marker" style="position:absolute; width:6px; height:6px; background:red; border-radius:50%; display:none;"></div>
+            </div>
+            <p style="font-size:10px; color:#888;">[Numpad 1-9] for Fast Zones | [Tab] Toggle Fail</p>
+        </div>
+    </div>
+</div>
+
+<div id="data-section">
+    <div class="header">
+        <div>OPTA_FULL_SUITE_v6</div>
+        <div class="stabilization-glow">DATA STABILIZATION: OPTIMAL</div>
+    </div>
+    <div id="log"></div>
+</div>
+
+<script>
+    let player, lastInput = 0, eventLog = [];
+    const DEBOUNCE = 250;
+
+    // Load YT API
+    const tag = document.createElement('script'); tag.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(tag);
+    function onYouTubeIframeAPIReady() {
+        player = new YT.Player('yt-player', { height: '100%', width: '100%', videoId: '', events: { 'onReady': () => player.setPlaybackRate(0.5) } });
+    }
+    function loadYoutube() { const id = document.getElementById('ytUrl').value.split('v=')[1]?.split('&')[0]; player.loadVideoById(id); }
+
+    // Input Handling
+    window.addEventListener('keydown', (e) => {
+        if (Date.now() - lastInput < DEBOUNCE) return;
+        if (['1','2','3','4'].includes(e.key)) logEvent(e.key);
+        if (e.key === 'Tab') { e.preventDefault(); toggleFail(); }
+        if (e.key === ' ') { e.preventDefault(); player.getPlayerState() === 1 ? player.pauseVideo() : player.playVideo(); }
+    });
+
+    function logEvent(key) {
+        const types = {'1':['PASS',1], '2':['SHOT',13], '3':['TACKLE',7], '4':['RECOVERY',49]};
+        const [type, id] = types[key];
+        const time = player.getCurrentTime();
+        const eventObj = { time, type, id, success: true, x: 50, y: 50 };
+        eventLog.push(eventObj);
+        renderLog();
+        lastInput = Date.now();
+    }
+
+    function toggleFail() {
+        if (eventLog.length > 0) {
+            eventLog[eventLog.length - 1].success = !eventLog[eventLog.length - 1].success;
+            renderLog();
+        }
+    }
+
+    function handleMapClick(e) {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+        const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+        if (eventLog.length > 0) {
+            eventLog[eventLog.length - 1].x = x;
+            eventLog[eventLog.length - 1].y = y;
+            renderLog();
+        }
+    }
+
+    function renderLog() {
+        logEl.innerHTML = '';
+        [...eventLog].reverse().forEach(ev => {
+            const div = document.createElement('div');
+            div.className = `event ${ev.success ? '' : 'fail'}`;
+            div.innerHTML = `<span>${Math.floor(ev.time/60)}:${Math.floor(ev.time%60).toString().padStart(2,'0')}</span>
+                             <span>${ev.type} (${ev.x},${ev.y})</span>
+                             <span>ID:${ev.id}</span>`;
+            logEl.appendChild(div);
+        });
+    }
+
+    function exportCSV() {
+        let csv = "Time,Event,ID,Success,X,Y\n";
+        eventLog.forEach(e => csv += `${e.time},${e.type},${e.id},${e.success},${e.x},${e.y}\n`);
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'match_data.csv'; a.click();
+    }
+    
+    function showReviewList() {
+        const flags = eventLog.filter(e => !e.success);
+        alert(flags.length ? `Review ${flags.length} failed actions.` : "All actions successful.");
+    }
+</script>
+</body>
+</html>
